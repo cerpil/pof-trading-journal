@@ -84,32 +84,54 @@ async function signInWithGithub() {
 
 async function signInWithEmail(e) {
     e.preventDefault();
+    if (!supabase) return showError('Supabase não inicializado. Verifique suas credenciais.');
+    
     const email = document.getElementById('emailInput').value;
     const password = document.getElementById('passwordInput').value;
     
     showLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    showLoading(false);
-    
-    if (error) showError(error.message);
+    try {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        showLoading(false);
+    }
 }
 
 async function signUp() {
+    if (!supabase) return showError('Supabase não inicializado. Verifique suas credenciais.');
+    
     const email = document.getElementById('emailInput').value;
     const password = document.getElementById('passwordInput').value;
     
     if (!email || !password) {
-        showError('Preencha email e senha');
+        Swal.fire('Campos vazios', 'Por favor, preencha o email e a senha para cadastrar.', 'info');
         return;
     }
     
     showLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
-    showLoading(false);
-    
-    if (error) showError(error.message);
-    else {
-        Swal.fire('Cadastro realizado!', 'Verifique seu email para confirmar o acesso.', 'success');
+    try {
+        const { data, error } = await supabase.auth.signUp({ 
+            email, 
+            password,
+            options: {
+                emailRedirectTo: window.location.origin
+            }
+        });
+        
+        if (error) throw error;
+        
+        if (data.user && data.session === null) {
+            Swal.fire('Verifique seu Email!', 'Um link de confirmação foi enviado para ' + email, 'success');
+        } else {
+            Swal.fire('Cadastro realizado!', 'Bem-vindo ao POF Trading Journal.', 'success');
+        }
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        showLoading(false);
     }
 }
 
