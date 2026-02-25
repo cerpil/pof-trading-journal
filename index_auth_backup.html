@@ -3,13 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POF Trading Journal - Acesso Direto</title>
+    <title>POF Trading Journal - Plataforma Profissional de Análise</title>
+    
+    <!-- Scripts Externos -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -21,6 +24,7 @@
             }
         }
     </script>
+    
     <style>
         body { background: linear-gradient(135deg, #0D0D0D 0%, #1A1A1A 50%, #2D3748 100%); color: #E8E8E8; font-family: 'Inter', sans-serif; min-height: 100vh; }
         .font-display { font-family: 'Cinzel', serif; }
@@ -42,16 +46,39 @@
     </style>
 </head>
 <body class="antialiased">
-    <!-- Main App (AUTH REMOVED FOR DIRECT TESTING) -->
-    <div id="app" class="fade-in">
+    <!-- Auth Screen -->
+    <div id="authScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-pof-darker via-pof-dark to-pof-metal">
+        <div class="w-full max-w-md p-8 metal-card rounded-2xl m-4">
+            <div class="text-center mb-10">
+                <h1 class="logo-pof text-5xl metal-text mb-2">POF</h1>
+                <p class="logo-trading metal-text">TRADING JOURNAL</p>
+                <p class="text-pof-darksilver text-sm tracking-widest uppercase mt-4">Plataforma Profissional de Análise</p>
+            </div>
+            <div class="space-y-4">
+                <form onsubmit="signInWithEmail(event)" class="space-y-4">
+                    <input type="email" id="emailInput" placeholder="seu@email.com" class="w-full px-4 py-3 metal-input rounded-lg">
+                    <input type="password" id="passwordInput" placeholder="Senha" class="w-full px-4 py-3 metal-input rounded-lg">
+                    <button type="submit" class="w-full py-4 metal-primary rounded-lg uppercase text-sm">Entrar</button>
+                    <button type="button" onclick="enterAsGuest()" class="w-full py-3 metal-button border-dashed rounded-lg text-xs opacity-70">
+                        <i class="fas fa-eye mr-2"></i>Modo Convidado (Teste)
+                    </button>
+                </form>
+                <p class="text-center text-xs text-pof-darksilver mt-6">
+                    Não tem conta? <button onclick="signUp()" class="text-pof-silver underline">Cadastre-se</button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="hidden">
         <aside class="sidebar fixed left-0 top-0 h-full w-64 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
             <div class="p-6 border-b border-pof-metal/30 text-center">
                 <h1 class="logo-pof text-3xl metal-text">POF</h1>
                 <p class="logo-trading metal-text mt-1">TRADING JOURNAL</p>
-                <span class="bg-rose-500/20 text-rose-400 text-[10px] px-2 py-1 rounded mt-2 inline-block font-bold tracking-widest">ACESSO DIRETO (DB)</span>
             </div>
             <nav class="p-4 space-y-1 mt-4">
-                <button onclick="showSection('dashboard')" class="nav-item w-full flex items-center gap-4 px-4 py-3 rounded-r-lg text-pof-light active" data-section="dashboard">
+                <button onclick="showSection('dashboard')" class="nav-item w-full flex items-center gap-4 px-4 py-3 rounded-r-lg text-pof-darksilver active" data-section="dashboard">
                     <i class="fas fa-chart-line w-5"></i><span>Dashboard</span>
                 </button>
                 <button onclick="showSection('journal')" class="nav-item w-full flex items-center gap-4 px-4 py-3 rounded-r-lg text-pof-darksilver" data-section="journal">
@@ -61,16 +88,25 @@
                     <i class="fas fa-chess-board w-5"></i><span>Playbooks</span>
                 </button>
             </nav>
+            <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-pof-metal/30">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="flex-1 min-w-0">
+                        <p id="userName" class="text-sm font-medium text-pof-light truncate"></p>
+                        <p id="userEmail" class="text-xs text-pof-darksilver truncate"></p>
+                    </div>
+                </div>
+                <button onclick="signOut()" class="w-full py-3 metal-button rounded-lg text-sm flex items-center justify-center gap-2">Sair</button>
+            </div>
         </aside>
 
         <main class="md:ml-64 min-h-screen p-6 md:p-8">
             <header class="flex justify-between items-center mb-8 pb-6 border-b border-pof-metal/30">
                 <div>
                     <h1 id="pageTitle" class="text-3xl font-display font-bold metal-text">Dashboard</h1>
-                    <p id="pageSubtitle" class="text-pof-darksilver text-sm uppercase">Visão Geral - Supabase Live</p>
+                    <p id="pageSubtitle" class="text-pof-darksilver text-sm uppercase">Visão Geral</p>
                 </div>
-                <button onclick="openTradeModal()" class="px-6 py-3 metal-primary rounded-lg flex items-center gap-2 shadow-lg shadow-black/50">
-                    <i class="fas fa-plus"></i><span class="font-bold">Novo Trade</span>
+                <button onclick="openTradeModal()" class="px-6 py-3 metal-primary rounded-lg flex items-center gap-2">
+                    <i class="fas fa-plus"></i><span>Novo Trade</span>
                 </button>
             </header>
 
@@ -102,6 +138,10 @@
                         <div class="text-xs text-pof-darksilver uppercase">Win Rate</div>
                         <div id="statWinRate" class="text-xl font-bold">0%</div>
                     </div>
+                    <div class="metal-card rounded-xl p-5 border-t-2 border-blue-500">
+                        <div class="text-xs text-pof-darksilver uppercase">Expectancy</div>
+                        <div id="statExpectancy" class="text-xl font-bold">0.0R</div>
+                    </div>
                     <div class="metal-card rounded-xl p-5 border-t-2 border-amber-500">
                         <div class="text-xs text-pof-darksilver uppercase">Total Trades</div>
                         <div id="statTotalTrades" class="text-xl font-bold">0</div>
@@ -118,11 +158,11 @@
                 <div class="metal-card rounded-xl overflow-hidden">
                     <table class="w-full text-sm">
                         <thead class="bg-pof-metal/20 text-left text-xs uppercase text-pof-darksilver">
-                            <tr><th class="px-6 py-4">Data</th><th class="px-6 py-4">Ativo</th><th class="px-6 py-4">Setup</th><th class="px-6 py-4">P&L</th><th class="px-6 py-4">Ação</th></tr>
+                            <tr><th class="px-6 py-4">Data</th><th class="px-6 py-4">Ativo</th><th class="px-6 py-4">P&L</th><th class="px-6 py-4">Ação</th></tr>
                         </thead>
                         <tbody id="allTradesBody"></tbody>
                     </table>
-                    <div id="emptyState" class="p-10 text-center text-pof-darksilver">Nenhum trade encontrado no banco de dados.</div>
+                    <div id="emptyState" class="p-10 text-center text-pof-darksilver">Nenhum trade encontrado</div>
                 </div>
             </section>
 
@@ -133,82 +173,97 @@
         </main>
     </div>
 
-    <!-- Modal Novo Trade -->
+    <!-- Modal -->
     <div id="tradeModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <form onsubmit="saveTrade(event)" class="metal-card rounded-2xl w-full max-w-md p-6 space-y-4">
-            <h3 class="text-xl font-bold metal-text">Registrar no Banco</h3>
+            <h3 class="text-xl font-bold metal-text">Novo Trade</h3>
             <div class="grid grid-cols-2 gap-4">
                 <input type="date" id="tradeDate" required class="metal-input p-2 rounded">
                 <input type="time" id="tradeTime" required class="metal-input p-2 rounded">
-                <input type="text" id="tradeAsset" placeholder="Ativo (ex: MNQ)" required class="metal-input p-2 rounded uppercase">
+                <input type="text" id="tradeAsset" placeholder="Ativo" required class="metal-input p-2 rounded uppercase">
                 <select id="tradeDirection" class="metal-input p-2 rounded"><option value="LONG">Long</option><option value="SHORT">Short</option></select>
-                <input type="number" step="0.01" id="tradeEntry" placeholder="Preço Entrada" required class="metal-input p-2 rounded">
-                <input type="number" step="0.01" id="tradeExit" placeholder="Preço Saída" required class="metal-input p-2 rounded">
-                <input type="number" id="tradeQuantity" placeholder="Quantidade" value="1" required class="metal-input p-2 rounded">
+                <input type="number" step="0.01" id="tradeEntry" placeholder="Entrada" required class="metal-input p-2 rounded">
+                <input type="number" step="0.01" id="tradeExit" placeholder="Saída" required class="metal-input p-2 rounded">
+                <input type="number" id="tradeQuantity" placeholder="Qtd" required class="metal-input p-2 rounded">
                 <select id="tradeSetup" class="metal-input p-2 rounded"><option value="">Sem Setup</option></select>
             </div>
-            <div class="flex justify-end gap-2 mt-4">
-                <button type="button" onclick="closeTradeModal()" class="px-4 py-2 metal-button rounded">Cancelar</button>
-                <button type="submit" class="metal-primary px-4 py-2 rounded">Salvar (Supabase)</button>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeTradeModal()" class="px-4 py-2">Cancelar</button>
+                <button type="submit" class="metal-primary px-4 py-2 rounded">Salvar</button>
             </div>
         </form>
     </div>
 
     <script>
+        console.log("POF Journal STANDALONE ACTIVE");
         const SUPABASE_URL = 'https://sfpvewxmbwfoutccyrpf.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmcHZld3htYndmb3V0Y2N5cnBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NzkwMzYsImV4cCI6MjA4NzU1NTAzNn0.0jGqZvNgvNs7b0sHIbJmq7j9Fisvi0pamOepxcMMakM';
         
-        let supabase, trades = [], playbooks = [], charts = {};
+        let supabase, currentUser = null, trades = [], playbooks = [], charts = {}, isGuest = false;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            if (window.supabase) {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                console.log("Supabase Client Initialized. Fetching data...");
-                await loadData();
-            }
-            
-            if(document.getElementById('tradeDate')) {
-                document.getElementById('tradeDate').valueAsDate = new Date();
-                document.getElementById('tradeTime').value = new Date().toTimeString().slice(0,5);
-            }
+            try {
+                if (window.supabase) {
+                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session) { currentUser = session.user; showApp(); }
+                    supabase.auth.onAuthStateChange((ev, sess) => { if (sess) { currentUser = sess.user; isGuest = false; showApp(); } else { currentUser = null; showAuth(); } });
+                }
+            } catch (e) { console.error("Supabase Error", e); }
+            document.getElementById('tradeDate').valueAsDate = new Date();
         });
 
+        window.enterAsGuest = function() {
+            isGuest = true;
+            currentUser = { id: 'guest', email: 'visitante@pof.pro', user_metadata: { full_name: 'Visitante' } };
+            playbooks = [{ name: 'Sniper V8' }];
+            const today = new Date().toISOString().slice(0,10);
+            trades = [
+                { id: 1, date: today, time: '10:00', asset: 'MNQ', direction: 'LONG', pnl: 200, entry_price: 18000, exit_price: 18100, quantity: 1 },
+                { id: 2, date: today, time: '14:00', asset: 'MNQ', direction: 'SHORT', pnl: -50, entry_price: 18050, exit_price: 18055, quantity: 1 }
+            ];
+            showApp();
+        };
+
+        window.signInWithEmail = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+            try { const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error; } 
+            catch (e) { Swal.fire('Erro', e.message, 'error'); }
+        };
+
+        window.signUp = async () => {
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+            try { const { error } = await supabase.auth.signUp({ email, password }); if (error) throw error; Swal.fire('Sucesso', 'Confirme seu e-mail', 'success'); }
+            catch (e) { Swal.fire('Erro', e.message, 'error'); }
+        };
+
+        window.signOut = () => { isGuest = false; currentUser = null; if (supabase) supabase.auth.signOut(); showAuth(); };
+
+        function showAuth() { document.getElementById('authScreen').classList.remove('hidden'); document.getElementById('app').classList.add('hidden'); }
+        function showApp() { 
+            document.getElementById('authScreen').classList.add('hidden'); 
+            document.getElementById('app').classList.remove('hidden'); 
+            document.getElementById('userName').textContent = currentUser.user_metadata?.full_name || currentUser.email;
+            document.getElementById('userEmail').textContent = currentUser.email;
+            if (!isGuest) loadData(); else updateAll();
+        }
+
         async function loadData() {
-            try {
-                // Tenta puxar direto do banco.
-                const [{ data: td, error: err1 }, { data: pb, error: err2 }] = await Promise.all([
-                    supabase.from('trades').select('*').order('created_at', { ascending: false }),
-                    supabase.from('playbooks').select('*')
-                ]);
-                
-                if (err1) {
-                    Swal.fire('Aviso', 'Erro de permissão! O RLS da tabela TRADES está ativado. Desative-o no Supabase para testar a gravação direta.\n' + err1.message, 'warning');
-                }
-                
-                trades = td || []; 
-                playbooks = pb || []; 
-                updateAll();
-            } catch (e) {
-                console.error("Exception loading data:", e);
-                updateAll();
-            }
+            const [{ data: td }, { data: pb }] = await Promise.all([
+                supabase.from('trades').select('*').eq('user_id', currentUser.id).order('date', { ascending: false }),
+                supabase.from('playbooks').select('*').eq('user_id', currentUser.id)
+            ]);
+            trades = td || []; playbooks = pb || []; updateAll();
         }
 
         function updateAll() {
             const stats = calculateStats();
             document.getElementById('statNetPnl').textContent = formatCurrency(stats.netPnl);
-            document.getElementById('statNetPnl').className = 'text-xl font-bold ' + (stats.netPnl >= 0 ? 'text-emerald-400' : 'text-rose-400');
             document.getElementById('statWinRate').textContent = stats.winRate.toFixed(1) + '%';
             document.getElementById('statTotalTrades').textContent = trades.length;
-            
-            // POF Score
-            const profitScore = Math.min(40, (stats.netPnl > 0 ? 20 : 0) + 10);
-            const totalScore = Math.round(profitScore + 20 + 20);
-            
-            document.getElementById('pofScore').textContent = totalScore;
-            document.getElementById('scoreCircle').style.setProperty('--score', totalScore);
-            document.getElementById('profitScore').textContent = profitScore;
-            
             updateDashboardCharts();
             updateJournalUI();
             updatePlaybooksUI();
@@ -221,99 +276,37 @@
         }
 
         function updateDashboardCharts() {
-            if (!window.Chart) return;
             if (charts.equity) charts.equity.destroy();
-            const ctx1 = document.getElementById('equityChart');
-            if (ctx1) {
-                charts.equity = new Chart(ctx1.getContext('2d'), { 
-                    type: 'line', 
-                    data: { 
-                        labels: trades.map(t => t.date).reverse(), 
-                        datasets: [{ 
-                            label: 'Equity', 
-                            data: trades.slice().reverse().map((t, i, arr) => arr.slice(0, i+1).reduce((s, x) => s + x.pnl, 0)), 
-                            borderColor: '#C0C0C0', fill: true, backgroundColor: 'rgba(192,192,192,0.1)'
-                        }] 
-                    }, 
-                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } } } 
-                });
-            }
-            
-            if (charts.daily) charts.daily.destroy();
-            const ctx2 = document.getElementById('dailyPnlChart');
-            if (ctx2) {
-                charts.daily = new Chart(ctx2.getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: trades.map(t => t.date),
-                        datasets: [{ label: 'P&L', data: trades.map(t => t.pnl), backgroundColor: trades.map(t => t.pnl >= 0 ? '#10b981' : '#ef4444') }]
-                    },
-                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                });
-            }
+            const ctx = document.getElementById('equityChart').getContext('2d');
+            charts.equity = new Chart(ctx, { type: 'line', data: { labels: trades.map(t => t.date), datasets: [{ label: 'Equity', data: trades.map((t, i) => trades.slice(i).reduce((s, x) => s + x.pnl, 0)), borderColor: '#C0C0C0' }] }, options: { maintainAspectRatio: false } });
         }
 
         function updateJournalUI() {
             const body = document.getElementById('allTradesBody');
-            if (!body) return;
-            body.innerHTML = trades.map(t => `<tr class="border-b border-pof-metal/10"><td class="px-6 py-4">${t.date}</td><td class="px-6 py-4 font-bold text-pof-light">${t.asset}</td><td class="px-6 py-4">${t.setup || '-'}</td><td class="px-6 py-4 font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${formatCurrency(t.pnl)}</td><td class="px-6 py-4"><button onclick="deleteTrade('${t.id}')"><i class="fas fa-trash text-rose-400"></i></button></td></tr>`).join('');
+            body.innerHTML = trades.map(t => `<tr class="border-b border-pof-metal/10"><td class="px-6 py-4">${t.date}</td><td class="px-6 py-4 font-bold">${t.asset}</td><td class="px-6 py-4 font-bold ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${formatCurrency(t.pnl)}</td><td class="px-6 py-4"><button onclick="deleteTrade('${t.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             document.getElementById('emptyState').classList.toggle('hidden', trades.length > 0);
         }
 
         window.deleteTrade = async (id) => {
-            const { error } = await supabase.from('trades').delete().eq('id', id);
-            if (error) Swal.fire('Erro', 'Não foi possível excluir: ' + error.message, 'error');
-            else { Swal.fire('Excluído!', '', 'success'); await loadData(); }
+            if (isGuest) trades = trades.filter(t => t.id != id);
+            else await supabase.from('trades').delete().eq('id', id);
+            if (!isGuest) loadData(); else updateAll();
         };
 
         window.saveTrade = async (e) => {
             e.preventDefault();
-            const t = { 
-                date: document.getElementById('tradeDate').value, 
-                time: document.getElementById('tradeTime').value, 
-                asset: document.getElementById('tradeAsset').value.toUpperCase(), 
-                direction: document.getElementById('tradeDirection').value, 
-                entry_price: parseFloat(document.getElementById('tradeEntry').value), 
-                exit_price: parseFloat(document.getElementById('tradeExit').value), 
-                quantity: parseInt(document.getElementById('tradeQuantity').value), 
-                setup: document.getElementById('tradeSetup').value || null,
-                pnl: 0, pnl_percent: 0, r_multiple: 1
-            };
-            
+            const t = { user_id: currentUser.id, date: document.getElementById('tradeDate').value, time: document.getElementById('tradeTime').value, asset: document.getElementById('tradeAsset').value.toUpperCase(), direction: document.getElementById('tradeDirection').value, entry_price: parseFloat(document.getElementById('tradeEntry').value), exit_price: parseFloat(document.getElementById('tradeExit').value), quantity: parseInt(document.getElementById('tradeQuantity').value), pnl: 0 };
             t.pnl = (t.exit_price - t.entry_price) * t.quantity * (t.direction === 'LONG' ? 1 : -1);
-            t.pnl_percent = ((t.exit_price - t.entry_price) / t.entry_price) * 100 * (t.direction === 'LONG' ? 1 : -1);
-            
-            const { error } = await supabase.from('trades').insert([t]);
-            
-            if (error) Swal.fire('Erro de Gravação', error.message + '\n\nO RLS da tabela deve estar DESATIVADO para este teste.', 'error');
-            else { Swal.fire('Sucesso!', 'Trade salvo no banco de dados.', 'success'); closeTradeModal(); await loadData(); }
+            if (isGuest) { t.id = Date.now(); trades.unshift(t); closeTradeModal(); updateAll(); }
+            else { await supabase.from('trades').insert([t]); loadData(); closeTradeModal(); }
         };
 
-        window.showSection = (s) => { 
-            document.querySelectorAll('.section').forEach(x => x.classList.add('hidden')); 
-            document.getElementById(s).classList.remove('hidden'); 
-            document.querySelectorAll('.nav-item').forEach(x => { x.classList.remove('active', 'text-pof-light'); x.classList.add('text-pof-darksilver'); });
-            document.querySelector(`[data-section="${s}"]`).classList.add('active', 'text-pof-light');
-        };
-        
+        window.showSection = (s) => { document.querySelectorAll('.section').forEach(x => x.classList.add('hidden')); document.getElementById(s).classList.remove('hidden'); };
         window.openTradeModal = () => document.getElementById('tradeModal').classList.remove('hidden');
         window.closeTradeModal = () => document.getElementById('tradeModal').classList.add('hidden');
         function formatCurrency(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v); }
-        
-        function updatePlaybooksUI() { 
-            const grid = document.getElementById('playbooksGrid');
-            if(grid) grid.innerHTML = playbooks.map(pb => `<div class="metal-card rounded-xl p-6"><h3 class="font-display font-bold text-pof-light mb-2">${pb.name}</h3><p class="text-sm text-pof-darksilver">${pb.description || ''}</p></div>`).join('');
-            const select = document.getElementById('tradeSetup');
-            if(select) select.innerHTML = '<option value="">Sem Setup</option>' + playbooks.map(pb => `<option value="${pb.name}">${pb.name}</option>`).join('');
-        }
-        
-        window.openPlaybookModal = async () => { 
-            const { value: formValues } = await Swal.fire({ title: 'Novo Playbook', html: '<input id="swal-name" class="swal2-input" placeholder="Nome do Setup"><input id="swal-desc" class="swal2-input" placeholder="Descrição">', focusConfirm: false, preConfirm: () => [document.getElementById('swal-name').value, document.getElementById('swal-desc').value] });
-            if (formValues && formValues[0]) {
-                const { error } = await supabase.from('playbooks').insert([{ name: formValues[0], description: formValues[1] }]);
-                if (error) Swal.fire('Erro', error.message, 'error'); else await loadData();
-            }
-        };
+        function updatePlaybooksUI() { /* ... */ }
+        window.openPlaybookModal = () => { /* ... */ };
     </script>
 </body>
 </html>
