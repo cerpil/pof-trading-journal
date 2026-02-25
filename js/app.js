@@ -14,6 +14,7 @@ let isGuest = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log("POF Journal Initializing...");
     try {
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
@@ -42,12 +43,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     } catch (e) {
-        console.error("Erro na inicialização:", e);
+        console.error("Initialization error:", e);
     }
 });
 
-// Bypass Function for Testing
-function enterAsGuest() {
+// --- GLOBAL FUNCTIONS (Called from HTML) ---
+
+window.enterAsGuest = function() {
+    console.log("Entering as Guest...");
     isGuest = true;
     currentUser = {
         id: 'guest-user',
@@ -74,7 +77,134 @@ function enterAsGuest() {
         position: 'top-end',
         showConfirmButton: false
     });
-}
+};
+
+window.signInWithEmail = async function(e) {
+    e.preventDefault();
+    const email = document.getElementById('emailInput').value;
+    const password = document.getElementById('passwordInput').value;
+    showLoading(true);
+    try {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        showLoading(false);
+    }
+};
+
+window.signUp = async function() {
+    const email = document.getElementById('emailInput').value;
+    const password = document.getElementById('passwordInput').value;
+    if (!email || !password) return Swal.fire('Erro', 'Preencha email e senha.', 'error');
+    showLoading(true);
+    try {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        Swal.fire('Sucesso', 'Verifique seu e-mail para confirmar o cadastro.', 'success');
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        showLoading(false);
+    }
+};
+
+window.signOut = async function() {
+    if (isGuest) { isGuest = false; currentUser = null; showAuth(); }
+    else await supabase.auth.signOut();
+};
+
+window.showSection = function(section) {
+    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+    const target = document.getElementById(section);
+    if (target) target.classList.remove('hidden');
+    
+    const titles = {
+        dashboard: ['Dashboard', 'Visão geral do desempenho'],
+        journal: ['Diário de Trades', 'Registro completo de operações'],
+        analytics: ['Análises Avançadas', 'Métricas detalhadas'],
+        calendar: ['Calendário', 'Visualização mensal do P&L'],
+        playbooks: ['Playbooks', 'Estratégias catalogadas']
+    };
+    
+    if (titles[section]) {
+        document.getElementById('pageTitle').textContent = titles[section][0];
+        document.getElementById('pageSubtitle').textContent = titles[section][1];
+    }
+    
+    if (section === 'calendar') renderCalendar();
+    if (section === 'playbooks') renderPlaybooks();
+};
+
+window.openTradeModal = function() {
+    document.getElementById('tradeModal').classList.remove('hidden');
+    document.getElementById('tradeModal').classList.add('flex');
+    updateSetupOptions();
+};
+
+window.closeTradeModal = function() {
+    document.getElementById('tradeModal').classList.add('hidden');
+    document.getElementById('tradeModal').classList.remove('flex');
+};
+
+window.saveTrade = async function(e) {
+    e.preventDefault();
+    const trade = {
+        user_id: currentUser.id,
+        date: document.getElementById('tradeDate').value,
+        time: document.getElementById('tradeTime').value,
+        asset: document.getElementById('tradeAsset').value.toUpperCase(),
+        direction: document.getElementById('tradeDirection').value,
+        entry_price: parseFloat(document.getElementById('tradeEntry').value),
+        exit_price: parseFloat(document.getElementById('tradeExit').value),
+        quantity: parseInt(document.getElementById('tradeQuantity').value),
+        setup: document.getElementById('tradeSetup').value || null,
+        notes: document.getElementById('tradeNotes').value,
+        created_at: new Date().toISOString()
+    };
+    
+    const multiplier = trade.direction === 'LONG' ? 1 : -1;
+    trade.pnl = (trade.exit_price - trade.entry_price) * trade.quantity * multiplier;
+    trade.r_multiple = 1;
+
+    if (isGuest) {
+        trade.id = Date.now();
+        trades.unshift(trade);
+        closeTradeModal();
+        updateAll();
+    } else {
+        showLoading(true);
+        const { data, error } = await supabase.from('trades').insert([trade]).select();
+        showLoading(false);
+        if (!error) { trades.unshift(data[0]); closeTradeModal(); updateAll(); }
+        else showError(error.message);
+    }
+};
+
+window.deleteTrade = function(id) {
+    if (isGuest) { trades = trades.filter(t => t.id !== id); updateAll(); }
+    else {
+        supabase.from('trades').delete().eq('id', id).then(() => { trades = trades.filter(t => t.id !== id); updateAll(); });
+    }
+};
+
+window.openPlaybookModal = async function() {
+    const { value: name } = await Swal.fire({ title: 'Novo Playbook', input: 'text', inputPlaceholder: 'Nome do Setup', showCancelButton: true });
+    if (name) {
+        if (isGuest) { playbooks.push({ name, description: '' }); renderPlaybooks(); }
+        else {
+            const { data, error } = await supabase.from('playbooks').insert([{ user_id: currentUser.id, name, description: '' }]).select();
+            if (!error) { playbooks.push(data[0]); renderPlaybooks(); }
+        }
+    }
+};
+
+window.changeMonth = function(delta) { currentMonth.setMonth(currentMonth.getMonth() + delta); renderCalendar(); };
+window.exportToCSV = function() { /* Implementação básica */ console.log("Exporting CSV..."); };
+window.filterTrades = function() { /* Implementação básica */ };
+
+// --- INTERNAL APP LOGIC ---
 
 function showAuth() {
     document.getElementById('authScreen').classList.remove('hidden');
@@ -92,42 +222,6 @@ function showApp() {
     
     if (!isGuest) loadData();
     else updateAll();
-}
-
-async function signInWithEmail(e) {
-    e.preventDefault();
-    const email = document.getElementById('emailInput').value;
-    const password = document.getElementById('passwordInput').value;
-    showLoading(true);
-    try {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        showLoading(false);
-    }
-}
-
-async function signUp() {
-    const email = document.getElementById('emailInput').value;
-    const password = document.getElementById('passwordInput').value;
-    if (!email || !password) return Swal.fire('Erro', 'Preencha email e senha.', 'error');
-    showLoading(true);
-    try {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        Swal.fire('Sucesso', 'Verifique seu e-mail para confirmar o cadastro.', 'success');
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        showLoading(false);
-    }
-}
-
-async function signOut() {
-    if (isGuest) { isGuest = false; currentUser = null; showAuth(); }
-    else await supabase.auth.signOut();
 }
 
 async function loadData() {
@@ -283,75 +377,35 @@ function updateJournal() {
     document.getElementById('emptyState').classList.toggle('hidden', trades.length > 0);
 }
 
-function updateAnalytics() {
-    if (trades.length === 0) return;
-    const stats = calculateStats();
-    document.getElementById('metricAvgRisk').textContent = formatCurrency(stats.avgLoser);
-    document.getElementById('metricAvgReward').textContent = formatCurrency(stats.avgWinner);
-    document.getElementById('metricAvgRR').textContent = stats.avgLoser > 0 ? '1:' + (stats.avgWinner / stats.avgLoser).toFixed(1) : '1:0';
-}
-
 function renderCalendar() {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     document.getElementById('calendarMonth').textContent = currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    
     const dailyPnl = {};
     trades.forEach(t => {
         const d = new Date(t.date + 'T12:00:00');
-        if (d.getMonth() === month && d.getFullYear() === year) {
-            dailyPnl[d.getDate()] = (dailyPnl[d.getDate()] || 0) + t.pnl;
-        }
+        if (d.getMonth() === month && d.getFullYear() === year) { dailyPnl[d.getDate()] = (dailyPnl[d.getDate()] || 0) + t.pnl; }
     });
-
     let html = '';
     for (let i = 0; i < firstDay; i++) html += '<div></div>';
     for (let day = 1; day <= daysInMonth; day++) {
         const pnl = dailyPnl[day] || 0;
         const colorClass = pnl > 0 ? 'bg-emerald-500/20 text-emerald-400' : (pnl < 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-pof-metal/10 text-pof-darksilver');
-        html += `<div class="aspect-square rounded border border-pof-metal/20 flex flex-col items-center justify-center ${colorClass}">
-            <span class="text-[10px] opacity-50">${day}</span>
-            <span class="text-[9px] font-bold">${pnl !== 0 ? Math.round(pnl) : ''}</span>
-        </div>`;
+        html += `<div class="aspect-square rounded border border-pof-metal/20 flex flex-col items-center justify-center ${colorClass}"><span class="text-[10px] opacity-50">${day}</span><span class="text-[9px] font-bold">${pnl !== 0 ? Math.round(pnl) : ''}</span></div>`;
     }
     document.getElementById('calendarGrid').innerHTML = html;
 }
-
-function changeMonth(delta) { currentMonth.setMonth(currentMonth.getMonth() + delta); renderCalendar(); }
 
 function renderPlaybooks() {
     const grid = document.getElementById('playbooksGrid');
     grid.innerHTML = playbooks.map(pb => {
         const pbTrades = trades.filter(t => t.setup === pb.name);
         const pnl = pbTrades.reduce((s, t) => s + t.pnl, 0);
-        return `
-            <div class="metal-card rounded-xl p-6">
-                <div class="flex justify-between items-start mb-4">
-                    <h3 class="font-display font-bold text-pof-light">${pb.name}</h3>
-                    <span class="px-2 py-1 rounded text-xs font-bold ${pnl >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">${formatCurrency(pnl)}</span>
-                </div>
-                <p class="text-sm text-pof-darksilver mb-4">${pb.description || ''}</p>
-                <div class="grid grid-cols-2 gap-4 text-center">
-                    <div><div class="text-lg font-bold">${pbTrades.length}</div><div class="text-[10px] uppercase text-pof-darksilver">Trades</div></div>
-                    <div><div class="text-lg font-bold">${pbTrades.length > 0 ? Math.round((pbTrades.filter(t => t.pnl > 0).length / pbTrades.length) * 100) : 0}%</div><div class="text-[10px] uppercase text-pof-darksilver">Win Rate</div></div>
-                </div>
-            </div>
-        `;
+        return `<div class="metal-card rounded-xl p-6"><div class="flex justify-between items-start mb-4"><h3 class="font-display font-bold text-pof-light">${pb.name}</h3><span class="px-2 py-1 rounded text-xs font-bold ${pnl >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">${formatCurrency(pnl)}</span></div><p class="text-sm text-pof-darksilver mb-4">${pb.description || ''}</p><div class="grid grid-cols-2 gap-4 text-center"><div><div class="text-lg font-bold">${pbTrades.length}</div><div class="text-[10px] uppercase text-pof-darksilver">Trades</div></div><div><div class="text-lg font-bold">${pbTrades.length > 0 ? Math.round((pbTrades.filter(t => t.pnl > 0).length / pbTrades.length) * 100) : 0}%</div><div class="text-[10px] uppercase text-pof-darksilver">Win Rate</div></div></div></div>`;
     }).join('');
     updateSetupOptions();
-}
-
-async function openPlaybookModal() {
-    const { value: name } = await Swal.fire({ title: 'Novo Playbook', input: 'text', inputPlaceholder: 'Nome do Setup', showCancelButton: true });
-    if (name) {
-        if (isGuest) { playbooks.push({ name, description: '' }); renderPlaybooks(); }
-        else {
-            const { data, error } = await supabase.from('playbooks').insert([{ user_id: currentUser.id, name, description: '' }]).select();
-            if (!error) { playbooks.push(data[0]); renderPlaybooks(); }
-        }
-    }
 }
 
 function updateSetupOptions() {
@@ -360,58 +414,6 @@ function updateSetupOptions() {
     select.innerHTML = '<option value="">Selecione...</option>' + playbooks.map(pb => `<option value="${pb.name}">${pb.name}</option>`).join('');
 }
 
-async function openTradeModal() { document.getElementById('tradeModal').classList.remove('hidden'); document.getElementById('tradeModal').classList.add('flex'); updateSetupOptions(); }
-function closeTradeModal() { document.getElementById('tradeModal').classList.add('hidden'); document.getElementById('tradeModal').classList.remove('flex'); }
-
-async function saveTrade(e) {
-    e.preventDefault();
-    const trade = {
-        user_id: currentUser.id,
-        date: document.getElementById('tradeDate').value,
-        time: document.getElementById('tradeTime').value,
-        asset: document.getElementById('tradeAsset').value.toUpperCase(),
-        direction: document.getElementById('tradeDirection').value,
-        entry_price: parseFloat(document.getElementById('tradeEntry').value),
-        exit_price: parseFloat(document.getElementById('tradeExit').value),
-        quantity: parseInt(document.getElementById('tradeQuantity').value),
-        setup: document.getElementById('tradeSetup').value || null,
-        notes: document.getElementById('tradeNotes').value,
-        created_at: new Date().toISOString()
-    };
-    const multiplier = trade.direction === 'LONG' ? 1 : -1;
-    trade.pnl = (trade.exit_price - trade.entry_price) * trade.quantity * multiplier;
-    trade.r_multiple = 1; // Simplificado para teste
-
-    if (isGuest) {
-        trade.id = Date.now();
-        trades.unshift(trade);
-        closeTradeModal();
-        updateAll();
-    } else {
-        showLoading(true);
-        const { data, error } = await supabase.from('trades').insert([trade]).select();
-        showLoading(false);
-        if (!error) { trades.unshift(data[0]); closeTradeModal(); updateAll(); }
-    }
-}
-
-function deleteTrade(id) {
-    if (isGuest) { trades = trades.filter(t => t.id !== id); updateAll(); }
-    else {
-        supabase.from('trades').delete().eq('id', id).then(() => { trades = trades.filter(t => t.id !== id); updateAll(); });
-    }
-}
-
-function showSection(section) {
-    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
-    document.getElementById(section).classList.remove('hidden');
-    if (section === 'calendar') renderCalendar();
-    if (section === 'playbooks') renderPlaybooks();
-}
-
 function formatCurrency(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v); }
 function showLoading(s) { document.getElementById('loadingOverlay')?.classList.toggle('hidden', !s); }
 function showError(m) { Swal.fire('Erro', m, 'error'); }
-function filterTrades() { /* Implementação simplificada */ }
-function exportToCSV() { /* Implementação simplificada */ }
-function enterAsGuest() { /* Já definida acima */ }
