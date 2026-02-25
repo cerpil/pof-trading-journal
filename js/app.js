@@ -1,8 +1,8 @@
 // POF Trading Journal - Main Application
 
-// Supabase Configuration - SUBSTITUA COM SUAS CREDENCIAIS
-const SUPABASE_URL = 'https://seu-projeto.supabase.co';
-const SUPABASE_ANON_KEY = 'sua-anon-key-aqui';
+// Supabase Configuration
+const SUPABASE_URL = 'https://sfpvewxmbwfoutccyrpf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmcHZld3htYndmb3V0Y2N5cnBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NzkwMzYsImV4cCI6MjA4NzU1NTAzNn0.0jGqZvNgvNs7b0sHIbJmq7j9Fisvi0pamOepxcMMakM';
 
 let supabase;
 let currentUser = null;
