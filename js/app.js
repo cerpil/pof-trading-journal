@@ -1,6 +1,7 @@
 // POF Trading Journal - Main Application
+console.log("POF Journal Script Loaded Successfully");
 
-// Supabase Configuration
+// --- CONFIGURATION ---
 const SUPABASE_URL = 'https://sfpvewxmbwfoutccyrpf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmcHZld3htYndmb3V0Y2N5cnBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NzkwMzYsImV4cCI6MjA4NzU1NTAzNn0.0jGqZvNgvNs7b0sHIbJmq7j9Fisvi0pamOepxcMMakM';
 
@@ -12,45 +13,10 @@ let currentMonth = new Date();
 let charts = {};
 let isGuest = false;
 
-// Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log("POF Journal Initializing...");
-    try {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            currentUser = session.user;
-            showApp();
-        } else {
-            showAuth();
-        }
-        
-        if (document.getElementById('tradeDate')) {
-            document.getElementById('tradeDate').valueAsDate = new Date();
-            document.getElementById('tradeTime').value = new Date().toTimeString().slice(0,5);
-        }
-        
-        supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN' && session) {
-                currentUser = session.user;
-                isGuest = false;
-                showApp();
-            } else if (event === 'SIGNED_OUT') {
-                currentUser = null;
-                isGuest = false;
-                showAuth();
-            }
-        });
-    } catch (e) {
-        console.error("Initialization error:", e);
-    }
-});
-
-// --- GLOBAL FUNCTIONS (Called from HTML) ---
+// --- EXPOSED GLOBAL FUNCTIONS ---
 
 window.enterAsGuest = function() {
-    console.log("Entering as Guest...");
+    console.log("Button clicked: Entering as Guest");
     isGuest = true;
     currentUser = {
         id: 'guest-user',
@@ -68,15 +34,17 @@ window.enterAsGuest = function() {
     ];
 
     showApp();
-    Swal.fire({
-        title: 'Modo Convidado Ativado',
-        text: 'Você está usando dados locais para teste.',
-        icon: 'info',
-        timer: 2000,
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false
-    });
+    if (window.Swal) {
+        Swal.fire({
+            title: 'Modo Convidado Ativado',
+            text: 'Você está usando dados locais para teste.',
+            icon: 'info',
+            timer: 2000,
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false
+        });
+    }
 };
 
 window.signInWithEmail = async function(e) {
@@ -85,6 +53,7 @@ window.signInWithEmail = async function(e) {
     const password = document.getElementById('passwordInput').value;
     showLoading(true);
     try {
+        if (!supabase) throw new Error("Banco de dados não inicializado.");
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
     } catch (error) {
@@ -97,12 +66,13 @@ window.signInWithEmail = async function(e) {
 window.signUp = async function() {
     const email = document.getElementById('emailInput').value;
     const password = document.getElementById('passwordInput').value;
-    if (!email || !password) return Swal.fire('Erro', 'Preencha email e senha.', 'error');
+    if (!email || !password) return alert('Preencha email e senha.');
     showLoading(true);
     try {
+        if (!supabase) throw new Error("Banco de dados não inicializado.");
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        Swal.fire('Sucesso', 'Verifique seu e-mail para confirmar o cadastro.', 'success');
+        alert('Verifique seu e-mail para confirmar o cadastro.');
     } catch (error) {
         showError(error.message);
     } finally {
@@ -111,8 +81,13 @@ window.signUp = async function() {
 };
 
 window.signOut = async function() {
-    if (isGuest) { isGuest = false; currentUser = null; showAuth(); }
-    else await supabase.auth.signOut();
+    if (isGuest) {
+        isGuest = false;
+        currentUser = null;
+        showAuth();
+    } else if (supabase) {
+        await supabase.auth.signOut();
+    }
 };
 
 window.showSection = function(section) {
@@ -151,7 +126,7 @@ window.closeTradeModal = function() {
 window.saveTrade = async function(e) {
     e.preventDefault();
     const trade = {
-        user_id: currentUser.id,
+        user_id: currentUser ? currentUser.id : 'guest',
         date: document.getElementById('tradeDate').value,
         time: document.getElementById('tradeTime').value,
         asset: document.getElementById('tradeAsset').value.toUpperCase(),
@@ -171,26 +146,31 @@ window.saveTrade = async function(e) {
     if (isGuest) {
         trade.id = Date.now();
         trades.unshift(trade);
-        closeTradeModal();
+        window.closeTradeModal();
         updateAll();
     } else {
         showLoading(true);
         const { data, error } = await supabase.from('trades').insert([trade]).select();
         showLoading(false);
-        if (!error) { trades.unshift(data[0]); closeTradeModal(); updateAll(); }
+        if (!error) { trades.unshift(data[0]); window.closeTradeModal(); updateAll(); }
         else showError(error.message);
     }
 };
 
 window.deleteTrade = function(id) {
-    if (isGuest) { trades = trades.filter(t => t.id !== id); updateAll(); }
-    else {
-        supabase.from('trades').delete().eq('id', id).then(() => { trades = trades.filter(t => t.id !== id); updateAll(); });
+    if (isGuest) { 
+        trades = trades.filter(t => t.id != id); 
+        updateAll(); 
+    } else {
+        supabase.from('trades').delete().eq('id', id).then(() => { 
+            trades = trades.filter(t => t.id != id); 
+            updateAll(); 
+        });
     }
 };
 
 window.openPlaybookModal = async function() {
-    const { value: name } = await Swal.fire({ title: 'Novo Playbook', input: 'text', inputPlaceholder: 'Nome do Setup', showCancelButton: true });
+    const name = prompt("Nome do Setup:");
     if (name) {
         if (isGuest) { playbooks.push({ name, description: '' }); renderPlaybooks(); }
         else {
@@ -200,11 +180,62 @@ window.openPlaybookModal = async function() {
     }
 };
 
-window.changeMonth = function(delta) { currentMonth.setMonth(currentMonth.getMonth() + delta); renderCalendar(); };
-window.exportToCSV = function() { /* Implementação básica */ console.log("Exporting CSV..."); };
-window.filterTrades = function() { /* Implementação básica */ };
+window.changeMonth = function(delta) { 
+    currentMonth.setMonth(currentMonth.getMonth() + delta); 
+    renderCalendar(); 
+};
 
-// --- INTERNAL APP LOGIC ---
+window.exportToCSV = function() { console.log("Exporting..."); };
+window.filterTrades = function() { 
+    // Filtro simplificado
+    const asset = document.getElementById('searchAsset').value.toUpperCase();
+    const rows = document.querySelectorAll('#allTradesBody tr');
+    rows.forEach(row => {
+        const rowAsset = row.cells[1].textContent;
+        row.style.display = rowAsset.includes(asset) ? '' : 'none';
+    });
+};
+
+// --- INITIALIZATION ---
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        if (window.supabase) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                currentUser = session.user;
+                showApp();
+            } else {
+                showAuth();
+            }
+            
+            supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_IN' && session) {
+                    currentUser = session.user;
+                    isGuest = false;
+                    showApp();
+                } else if (event === 'SIGNED_OUT') {
+                    currentUser = null;
+                    isGuest = false;
+                    showAuth();
+                }
+            });
+        } else {
+            console.warn("Supabase library not loaded. Auth will not work.");
+            showAuth();
+        }
+        
+        if (document.getElementById('tradeDate')) {
+            document.getElementById('tradeDate').valueAsDate = new Date();
+            document.getElementById('tradeTime').value = new Date().toTimeString().slice(0,5);
+        }
+    } catch (e) {
+        console.error("Init Error:", e);
+    }
+});
+
+// --- UI HELPERS ---
 
 function showAuth() {
     document.getElementById('authScreen').classList.remove('hidden');
@@ -217,8 +248,6 @@ function showApp() {
     
     document.getElementById('userName').textContent = currentUser.user_metadata?.full_name || currentUser.email;
     document.getElementById('userEmail').textContent = currentUser.email;
-    document.getElementById('userAvatar').src = currentUser.user_metadata?.avatar_url || 
-        `https://ui-avatars.com/api/?name=${currentUser.email}&background=2D3748&color=C0C0C0`;
     
     if (!isGuest) loadData();
     else updateAll();
@@ -271,7 +300,7 @@ function updateDashboard() {
 }
 
 function calculateStats() {
-    if (trades.length === 0) return { netPnl: 0, winRate: 0, profitFactor: 0, expectancy: 0, avgWinner: 0, avgLoser: 0, totalTrades: 0, grossProfit: 0, grossLoss: 0, wins: 0, losses: 0, largestWin: 0, largestLoss: 0 };
+    if (trades.length === 0) return { netPnl: 0, winRate: 0, profitFactor: 0, expectancy: 0, avgWinner: 0, avgLoser: 0, totalTrades: 0 };
     const wins = trades.filter(t => t.pnl > 0);
     const losses = trades.filter(t => t.pnl < 0);
     const grossProfit = wins.reduce((sum, t) => sum + t.pnl, 0);
@@ -298,6 +327,7 @@ function calculatePofScore() {
 }
 
 function updateCharts() {
+    if (!window.Chart) return;
     const equityData = calculateEquityCurve();
     const ctx1 = document.getElementById('equityChart');
     if (ctx1) {
@@ -382,7 +412,9 @@ function renderCalendar() {
     const month = currentMonth.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    document.getElementById('calendarMonth').textContent = currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const monthEl = document.getElementById('calendarMonth');
+    if (monthEl) monthEl.textContent = currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    
     const dailyPnl = {};
     trades.forEach(t => {
         const d = new Date(t.date + 'T12:00:00');
@@ -395,11 +427,13 @@ function renderCalendar() {
         const colorClass = pnl > 0 ? 'bg-emerald-500/20 text-emerald-400' : (pnl < 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-pof-metal/10 text-pof-darksilver');
         html += `<div class="aspect-square rounded border border-pof-metal/20 flex flex-col items-center justify-center ${colorClass}"><span class="text-[10px] opacity-50">${day}</span><span class="text-[9px] font-bold">${pnl !== 0 ? Math.round(pnl) : ''}</span></div>`;
     }
-    document.getElementById('calendarGrid').innerHTML = html;
+    const grid = document.getElementById('calendarGrid');
+    if (grid) grid.innerHTML = html;
 }
 
 function renderPlaybooks() {
     const grid = document.getElementById('playbooksGrid');
+    if (!grid) return;
     grid.innerHTML = playbooks.map(pb => {
         const pbTrades = trades.filter(t => t.setup === pb.name);
         const pnl = pbTrades.reduce((s, t) => s + t.pnl, 0);
@@ -415,5 +449,5 @@ function updateSetupOptions() {
 }
 
 function formatCurrency(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v); }
-function showLoading(s) { document.getElementById('loadingOverlay')?.classList.toggle('hidden', !s); }
-function showError(m) { Swal.fire('Erro', m, 'error'); }
+function showLoading(s) { const l = document.getElementById('loadingOverlay'); if (l) l.classList.toggle('hidden', !s); }
+function showError(m) { if (window.Swal) Swal.fire('Erro', m, 'error'); else alert(m); }
